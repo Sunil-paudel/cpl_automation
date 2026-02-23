@@ -110,6 +110,8 @@ Open: `http://localhost:8503`
 
 ## MCP backend (for external website agent retrieval)
 
+MCP backend repo: **https://github.com/Sunil-paudel/cpl_automation_mcp**
+
 If you are using the separate MCP server (`cplmcp`), run it in another terminal.
 
 ```bash
