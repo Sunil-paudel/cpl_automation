@@ -10,18 +10,42 @@ from __future__ import annotations
 
 import json
 import os
+import time
 from typing import Dict, List, Optional
 
 import requests
 
 
+# Safety controls to prevent runaway LLM usage/cost.
+_LLM_CALL_COUNT = 0
+_LLM_WINDOW_START = time.time()
+
+
+def _llm_budget_available() -> bool:
+    global _LLM_CALL_COUNT, _LLM_WINDOW_START
+    max_calls_total = int(os.getenv("LLM_MAX_CALLS_TOTAL", "120"))
+    max_calls_per_minute = int(os.getenv("LLM_MAX_CALLS_PER_MINUTE", "40"))
+
+    now = time.time()
+    if now - _LLM_WINDOW_START >= 60:
+        _LLM_WINDOW_START = now
+        _LLM_CALL_COUNT = 0
+
+    if _LLM_CALL_COUNT >= max_calls_total:
+        return False
+    if _LLM_CALL_COUNT >= max_calls_per_minute:
+        return False
+    return True
+
+
 def llm_enabled() -> bool:
-    return bool(os.getenv("OPENAI_API_KEY"))
+    return bool(os.getenv("OPENAI_API_KEY")) and _llm_budget_available()
 
 
 def _chat_json(system: str, user: str, timeout: int = 25) -> Optional[dict]:
+    global _LLM_CALL_COUNT
     api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
+    if not api_key or not _llm_budget_available():
         return None
 
     # Lightweight Responses-style call via Chat Completions compatible endpoint.
@@ -41,6 +65,7 @@ def _chat_json(system: str, user: str, timeout: int = 25) -> Optional[dict]:
     }
 
     try:
+        _LLM_CALL_COUNT += 1
         r = requests.post(url, headers=headers, json=payload, timeout=timeout)
         r.raise_for_status()
         data = r.json()
