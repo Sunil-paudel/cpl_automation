@@ -199,6 +199,26 @@ python -c "from src.db import init_db; init_db()"
 
 ---
 
+## MVC + Data model overview
+
+### MVC mapping
+- **Model:** `src/db.py`, `src/matching.py`, `src/retrieval_agent.py`, `src/transcript_extraction.py`, `src/workflow.py`, `src/shea_loader.py`
+- **View:** Streamlit UI in `app.py` (Upload, Suggestions, Review pages)
+- **Controller:** button/event flow in `app.py` that calls model logic and updates DB
+
+### Database tables (models)
+- **`shea_units`**: SHEA master curriculum data (code, title, description, outcomes, course, AQF)
+- **`external_units`**: transcript + external institution unit data (grade, semester, enriched content, source URL)
+- **`suggestions`**: matching outcomes (score, confidence, explanation, component breakdown)
+- **`decisions`**: reviewer decisions (approved/rejected/needs_review/override + notes)
+- **`external_unit_url_cache`**: cached resolved unit URLs for faster retrieval
+
+### Data flow
+1. Load SHEA data → `shea_units`
+2. Parse transcript + retrieve external details → `external_units`
+3. Run matching → `suggestions`
+4. Reviewer actions → `decisions`
+
 ## Full documentation
 
 - Beginner guide (markdown): `docs/INSTALL_AND_USER_GUIDE.md`

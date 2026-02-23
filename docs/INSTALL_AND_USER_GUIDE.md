@@ -245,6 +245,42 @@ python -c "from src.db import init_db; init_db()"
 
 ---
 
+## MVC and data model (simple explanation)
+
+### MVC in this project
+- **Model** = data and logic (`src/` files + SQLite tables)
+- **View** = what user sees (`app.py` Streamlit pages)
+- **Controller** = button actions in `app.py` that trigger model operations
+
+### Tables used by the app
+
+1. **`shea_units`**
+   - Stores official SHEA unit data
+   - Example info: unit code, name, description, learning outcomes, course level
+
+2. **`external_units`**
+   - Stores parsed transcript units and externally retrieved unit details
+   - Example info: institution, unit code, grade, semester, source URL, overview/outcomes
+
+3. **`suggestions`**
+   - Stores matching results between external and SHEA units
+   - Example info: confidence score, confidence %, explanation, score components
+
+4. **`decisions`**
+   - Stores reviewer decisions on each suggestion
+   - Example info: approved/rejected/needs_review/override, reviewer notes
+
+5. **`external_unit_url_cache`**
+   - Stores previously discovered unit URLs to speed up retrieval
+
+### Data flow (how records move)
+1. Load SHEA Excel → inserts into `shea_units`
+2. Upload transcript + enrichment → inserts/updates `external_units`
+3. Generate suggestions → inserts into `suggestions`
+4. Review page actions → inserts into `decisions`
+
+---
+
 ## Folder map (what is where)
 
 - `app.py` → main app
