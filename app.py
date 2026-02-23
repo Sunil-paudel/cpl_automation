@@ -8,6 +8,7 @@ Notes:
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
 
@@ -229,7 +230,7 @@ elif page == "CPL Suggestions":
     with c_agent1:
         agent_workers = st.slider("Agent workers", min_value=1, max_value=12, value=6)
     with c_agent2:
-        request_timeout_seconds = st.slider("Per-page timeout (sec)", min_value=5, max_value=30, value=12)
+        request_timeout_seconds = st.slider("Per-page timeout (sec)", min_value=4, max_value=30, value=8)
 
     if selected_url and st.button("Run MCP check: crawl external course website"):
         if not external:
@@ -241,11 +242,12 @@ elif page == "CPL Suggestions":
                     request_timeout_seconds=request_timeout_seconds,
                 )
                 harvested = {}
-                for unit in external:
+
+                def _enrich_one(unit: dict):
                     code = str(unit.get("unit_code") or "").upper()
                     title = str(unit.get("title") or "")
                     if not code:
-                        continue
+                        return "", None
                     res = retrieval_agent.enrich_external_unit(
                         unit_code=code,
                         title=title,
@@ -254,7 +256,7 @@ elif page == "CPL Suggestions":
                         request_timeout_seconds=request_timeout_seconds,
                     )
                     if res and res.retrieval_confidence > 0 and (res.description or res.learning_outcomes or res.topics):
-                        harvested[code] = {
+                        return code, {
                             "title": title,
                             "description": res.description,
                             "learning_outcomes": res.learning_outcomes,
@@ -263,6 +265,18 @@ elif page == "CPL Suggestions":
                             "retrieval_mode": res.retrieval_mode,
                             "retrieval_confidence": res.retrieval_confidence,
                         }
+                    return code, None
+
+                max_parallel = max(1, min(agent_workers, len(external)))
+                with ThreadPoolExecutor(max_workers=max_parallel) as ex:
+                    futures = [ex.submit(_enrich_one, unit) for unit in external]
+                    for f in as_completed(futures):
+                        try:
+                            code, payload = f.result()
+                            if code and payload:
+                                harvested[code] = payload
+                        except Exception:
+                            continue
 
                 # SHEA crawling removed: use locally loaded SHEA dataset from DB.
 
