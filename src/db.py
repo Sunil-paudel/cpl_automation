@@ -108,6 +108,17 @@ def init_db(db_path: Path = DB_PATH) -> None:
                 last_seen DATETIME DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE(institution, unit_code)
             );
+
+            CREATE TABLE IF NOT EXISTS institution_registry (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                institution_name TEXT NOT NULL,
+                qualification TEXT NOT NULL DEFAULT '',
+                base_url TEXT NOT NULL,
+                is_active INTEGER NOT NULL DEFAULT 1,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(institution_name, qualification)
+            );
             """
         )
 
@@ -379,3 +390,32 @@ def upsert_cached_unit_url(
                 retrieval_mode or "",
             ),
         )
+
+
+def upsert_institution_registry_rows(rows: List[Dict[str, Any]], db_path: Path = DB_PATH) -> None:
+    if not rows:
+        return
+    with get_conn(db_path) as conn:
+        conn.executemany(
+            """
+            INSERT INTO institution_registry (institution_name, qualification, base_url, is_active, updated_at)
+            VALUES (:institution_name, :qualification, :base_url, :is_active, CURRENT_TIMESTAMP)
+            ON CONFLICT(institution_name, qualification) DO UPDATE SET
+                base_url=excluded.base_url,
+                is_active=excluded.is_active,
+                updated_at=CURRENT_TIMESTAMP
+            """,
+            rows,
+        )
+
+
+def fetch_institution_registry_rows(db_path: Path = DB_PATH):
+    with get_conn(db_path) as conn:
+        return conn.execute(
+            """
+            SELECT institution_name, qualification, base_url, is_active
+            FROM institution_registry
+            WHERE is_active = 1
+            ORDER BY institution_name, qualification
+            """
+        ).fetchall()
